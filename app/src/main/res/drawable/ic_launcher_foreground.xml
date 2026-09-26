@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer decorative circle ring -->
+    <path
+        android:fillColor="#33FFFFFF"
+        android:pathData="M54,22 C71.67,22 86,36.33 86,54 C86,71.67 71.67,86 54,86 C36.33,86 22,71.67 22,54 C22,36.33 36.33,22 54,22 Z" />
+
+    <!-- Musical Note Icon -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M62,34 L46,38 L46,62 C44.1,60.8 41.6,60 39,60 C32.9,60 28,64.5 28,70 C28,75.5 32.9,80 39,80 C45.1,80 50,75.5 50,70 L50,45 L62,41 L62,34 Z" />
+</vector>
