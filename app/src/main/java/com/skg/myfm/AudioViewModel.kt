@@ -16,10 +16,12 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import com.google.common.util.concurrent.ListenableFuture
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -170,7 +172,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             sortCriterion = criterion,
             isAscendingOrder = isAscending
         )
-    }
+    }.flowOn(Dispatchers.Default)
 
     private val selectionFlow = combine(
         _selectedAudioIds,
@@ -239,7 +241,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
             }
         }, ContextCompat.getMainExecutor(application))
 
-        // Periodic position tracker to update progress
+        // Periodic position tracker to update live slider (does NOT trigger list re-sort)
         viewModelScope.launch {
             while (true) {
                 delay(500)
@@ -252,9 +254,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                         _currentPositionMs.value = pos
                         _currentDurationMs.value = dur
                         if (p.isPlaying) {
-                            progressManager.saveProgress(currentTrack.id, pos, dur)
-                            val isCompleted = progressManager.isTrackCompleted(currentTrack.id)
-                            updateTrackState(currentTrack.id, isCompleted = isCompleted, positionMs = pos)
+                            progressManager.saveProgress(currentTrack.id, pos, dur, forceSave = false)
                         }
                     }
                 }
@@ -266,6 +266,16 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(isPlaying: Boolean) {
                 _isPlaying.value = isPlaying
+                // Save progress to disk and list when pausing
+                if (!isPlaying) {
+                    val currentTrack = _currentlyPlaying.value
+                    if (currentTrack != null) {
+                        val pos = player.currentPosition
+                        progressManager.saveProgress(currentTrack.id, pos, currentTrack.duration, forceSave = true)
+                        val isCompleted = progressManager.isTrackCompleted(currentTrack.id)
+                        updateTrackState(currentTrack.id, isCompleted = isCompleted, positionMs = pos)
+                    }
+                }
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -282,6 +292,7 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
                     val currentTrack = _currentlyPlaying.value
                     if (currentTrack != null) {
                         progressManager.markCompleted(currentTrack.id)
+                        progressManager.saveProgress(currentTrack.id, currentTrack.duration, currentTrack.duration, forceSave = true)
                         updateTrackState(currentTrack.id, isCompleted = true, positionMs = currentTrack.duration)
                     }
                 }
@@ -361,6 +372,10 @@ class AudioViewModel(application: Application) : AndroidViewModel(application) {
         val target = positionMs.coerceIn(0L, _currentDurationMs.value)
         p.seekTo(target)
         _currentPositionMs.value = target
+        val currentTrack = _currentlyPlaying.value
+        if (currentTrack != null) {
+            progressManager.saveProgress(currentTrack.id, target, _currentDurationMs.value, forceSave = true)
+        }
     }
 
     fun seekForward(deltaMs: Long = 10000L) {
