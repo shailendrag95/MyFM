@@ -36,11 +36,13 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -447,83 +449,89 @@ fun AudioPlayerApp(viewModel: AudioViewModel) {
                     }
                 }
 
-                if (uiState.audioList.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = when {
-                                uiState.appliedRegexPattern.isNotEmpty() && uiState.selectedFolder != null ->
-                                    "No files in '${uiState.selectedFolder}' matching regex '${uiState.appliedRegexPattern}'."
-                                uiState.appliedRegexPattern.isNotEmpty() ->
-                                    "No audio files matching regex '${uiState.appliedRegexPattern}'."
-                                uiState.selectedFolder != null ->
-                                    "No audio files in folder '${uiState.selectedFolder}'."
-                                else ->
-                                    "No audio files found on device."
-                            },
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        state = lazyListState,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .pointerInput(uiState.isSelectionMode) {
-                                if (uiState.isSelectionMode) {
-                                    detectDragGestures(
-                                        onDragStart = { offset ->
-                                            val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                                            val touchedItem = visibleItems.find { item ->
-                                                offset.y >= item.offset && offset.y <= (item.offset + item.size)
-                                            }
-                                            touchedItem?.let { item ->
-                                                val track = uiState.audioList.getOrNull(item.index)
-                                                track?.let { audio ->
-                                                    viewModel.selectItemIfNotSelected(audio.id)
-                                                }
-                                            }
-                                        },
-                                        onDrag = { change, _ ->
-                                            change.consume()
-                                            val y = change.position.y
-                                            val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
-                                            val touchedItem = visibleItems.find { item ->
-                                                y >= item.offset && y <= (item.offset + item.size)
-                                            }
-                                            touchedItem?.let { item ->
-                                                val track = uiState.audioList.getOrNull(item.index)
-                                                track?.let { audio ->
-                                                    viewModel.selectItemIfNotSelected(audio.id)
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                            },
-                        contentPadding = PaddingValues(bottom = 16.dp)
-                    ) {
-                        items(
-                            items = uiState.audioList,
-                            key = { it.id }
-                        ) { item ->
-                            AudioItemRow(
-                                item = item,
-                                isCurrentlyPlaying = item.id == uiState.currentlyPlaying?.id,
-                                isSelectionMode = uiState.isSelectionMode,
-                                isSelected = uiState.selectedAudioIds.contains(item.id),
-                                onItemClick = { viewModel.playAudio(item) },
-                                onItemLongClick = { viewModel.enterSelectionMode(item.id) },
-                                onDeleteSingle = {
-                                    singleItemToDelete = item
-                                    showDeleteConfirmDialog = true
-                                }
+                PullToRefreshBox(
+                    isRefreshing = uiState.isLoading,
+                    onRefresh = { viewModel.loadAudioFiles() },
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    if (uiState.audioList.isEmpty()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(16.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = when {
+                                    uiState.appliedRegexPattern.isNotEmpty() && uiState.selectedFolder != null ->
+                                        "No files in '${uiState.selectedFolder}' matching regex '${uiState.appliedRegexPattern}'."
+                                    uiState.appliedRegexPattern.isNotEmpty() ->
+                                        "No audio files matching regex '${uiState.appliedRegexPattern}'."
+                                    uiState.selectedFolder != null ->
+                                        "No audio files in folder '${uiState.selectedFolder}'."
+                                    else ->
+                                        "No audio files found on device."
+                                },
+                                style = MaterialTheme.typography.bodyLarge
                             )
-                            HorizontalDivider()
+                        }
+                    } else {
+                        LazyColumn(
+                            state = lazyListState,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(uiState.isSelectionMode) {
+                                    if (uiState.isSelectionMode) {
+                                        detectDragGestures(
+                                            onDragStart = { offset ->
+                                                val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+                                                val touchedItem = visibleItems.find { item ->
+                                                    offset.y >= item.offset && offset.y <= (item.offset + item.size)
+                                                }
+                                                touchedItem?.let { item ->
+                                                    val track = uiState.audioList.getOrNull(item.index)
+                                                    track?.let { audio ->
+                                                        viewModel.selectItemIfNotSelected(audio.id)
+                                                    }
+                                                }
+                                            },
+                                            onDrag = { change, _ ->
+                                                change.consume()
+                                                val y = change.position.y
+                                                val visibleItems = lazyListState.layoutInfo.visibleItemsInfo
+                                                val touchedItem = visibleItems.find { item ->
+                                                    y >= item.offset && y <= (item.offset + item.size)
+                                                }
+                                                touchedItem?.let { item ->
+                                                    val track = uiState.audioList.getOrNull(item.index)
+                                                    track?.let { audio ->
+                                                        viewModel.selectItemIfNotSelected(audio.id)
+                                                    }
+                                                }
+                                            }
+                                        )
+                                    }
+                                },
+                            contentPadding = PaddingValues(bottom = 16.dp)
+                        ) {
+                            items(
+                                items = uiState.audioList,
+                                key = { it.id }
+                            ) { item ->
+                                AudioItemRow(
+                                    item = item,
+                                    isCurrentlyPlaying = item.id == uiState.currentlyPlaying?.id,
+                                    isSelectionMode = uiState.isSelectionMode,
+                                    isSelected = uiState.selectedAudioIds.contains(item.id),
+                                    onItemClick = { viewModel.playAudio(item) },
+                                    onItemLongClick = { viewModel.enterSelectionMode(item.id) },
+                                    onDeleteSingle = {
+                                        singleItemToDelete = item
+                                        showDeleteConfirmDialog = true
+                                    }
+                                )
+                                HorizontalDivider()
+                            }
                         }
                     }
                 }

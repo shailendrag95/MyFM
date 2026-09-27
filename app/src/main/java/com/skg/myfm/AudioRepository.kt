@@ -24,8 +24,8 @@ class AudioRepository(private val context: Context) {
             MediaStore.Audio.Media.DATA
         )
 
-        // Query only music/audio files
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0"
+        // Query all valid audio files (music, podcasts, downloads, WhatsApp audio, recordings, etc.)
+        val selection = "${MediaStore.Audio.Media.SIZE} > 0"
 
         context.contentResolver.query(
             collection,
@@ -44,7 +44,8 @@ class AudioRepository(private val context: Context) {
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idColumn)
                 val title = cursor.getString(titleColumn) ?: "Unknown Title"
-                val artist = cursor.getString(artistColumn) ?: "Unknown Artist"
+                val rawArtist = cursor.getString(artistColumn)
+                val artist = if (!rawArtist.isNullOrEmpty() && rawArtist != "<unknown>") rawArtist else "Unknown Artist"
                 val duration = cursor.getLong(durationColumn)
 
                 val dataPath = if (dataColumn != -1) cursor.getString(dataColumn) else ""
